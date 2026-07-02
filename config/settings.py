@@ -18,6 +18,13 @@ if os.environ.get('RAILWAY_PROJECT_ID'):
 else:
     ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
 
+# Railway terminates TLS at its edge and forwards to the container over
+# plain HTTP, so Django must trust X-Forwarded-Proto to know the original
+# request was HTTPS — otherwise CSRF's same-origin check fails.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+_railway_public_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+CSRF_TRUSTED_ORIGINS = [f'https://{_railway_public_domain}'] if _railway_public_domain else []
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
