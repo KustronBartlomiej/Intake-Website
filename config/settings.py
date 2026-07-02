@@ -8,11 +8,16 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-qnnr5q3ul$1en$))sj%gm
 
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-# Railway sets RAILWAY_PUBLIC_DOMAIN automatically; accept it alongside any custom list
+# Railway sets RAILWAY_PUBLIC_DOMAIN / RAILWAY_PRIVATE_DOMAIN automatically;
+# the internal healthcheck hits the service over the private network using
+# the private domain as Host header, so both must be accepted.
 _allowed = os.environ.get('ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
-_railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
-if _railway_domain:
-    _allowed.append(_railway_domain)
+_railway_public_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+_railway_private_domain = os.environ.get('RAILWAY_PRIVATE_DOMAIN', '')
+if _railway_public_domain:
+    _allowed.append(_railway_public_domain)
+if _railway_private_domain:
+    _allowed.append(_railway_private_domain)
 ALLOWED_HOSTS = _allowed
 
 INSTALLED_APPS = [
