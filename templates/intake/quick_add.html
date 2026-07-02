@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% block title %}Quick Add — Intake{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <a href="{% url 'home' %}" class="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Back
+    </a>
+    <h1 class="text-base font-bold text-gray-900">Quick Add</h1>
+    <button onclick="document.getElementById('new-product-modal').classList.remove('hidden')"
+      class="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Products -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-50">
+      <p class="text-xs font-semibold text-green-500 uppercase tracking-widest">Products</p>
+    </div>
+    {% if products %}
+      <div class="divide-y divide-gray-50">
+        {% for product in products %}
+          <div class="flex items-center px-5 py-3.5 gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ product.name }}</p>
+              <p class="text-xs text-gray-400">{{ product.kcal_per_100g }} kcal · {{ product.protein_per_100g }}g protein / 100g</p>
+            </div>
+            <button onclick="openUseModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }})"
+              class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              Use
+            </button>
+            <form method="post" action="{% url 'product_delete' product.pk %}" class="inline"
+              onsubmit="return confirm('Delete {{ product.name|escapejs }}?')">
+              {% csrf_token %}
+              <button type="submit" class="text-gray-300 hover:text-red-400 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="px-5 py-8 text-center">
+        <p class="text-sm text-gray-400 mb-3">No products yet.</p>
+        <button onclick="document.getElementById('new-product-modal').classList.remove('hidden')"
+          class="text-sm font-semibold text-green-600 hover:text-green-700">
+          Add your first product →
+        </button>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Recent today -->
+  {% if recent %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-50">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Recent today</p>
+      </div>
+      <div class="divide-y divide-gray-50">
+        {% for entry in recent %}
+          <div class="flex items-center px-5 py-3 gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ entry.name }}</p>
+              <p class="text-xs text-gray-400">{{ entry.weight_g|floatformat:0 }}g</p>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-semibold text-gray-700">{{ entry.total_kcal|floatformat:0 }} kcal</p>
+              <p class="text-xs text-gray-400">{{ entry.total_protein|floatformat:1 }}g protein</p>
+            </div>
+            <form method="post" action="{% url 'entry_delete' entry.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{% url 'quick_add' %}">
+              <button type="submit" class="text-gray-300 hover:text-red-400 transition-colors ml-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+
+<!-- Use product modal -->
+<div id="use-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="closeUseModal()"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto">
+    <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+    <h3 class="text-base font-bold text-gray-900 mb-1" id="use-product-name"></h3>
+    <p class="text-xs text-gray-400 mb-5" id="use-product-info"></p>
+    <form method="post" id="use-form" action="">
+      {% csrf_token %}
+      <div class="flex items-center gap-3 mb-3">
+        <button type="button" onclick="adjustUseWeight(-10)"
+          class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold flex items-center justify-center transition-colors">−</button>
+        <input type="number" id="use-weight" name="weight_g" min="1" max="9999" value="100"
+          class="flex-1 text-center text-2xl font-bold text-gray-900 border border-gray-200 rounded-xl py-2.5
+                 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent">
+        <button type="button" onclick="adjustUseWeight(10)"
+          class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold flex items-center justify-center transition-colors">+</button>
+      </div>
+      <p class="text-center text-sm text-gray-500 mb-5 h-5" id="use-preview"></p>
+      <button type="submit"
+        class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors">
+        Add to today
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- New product modal -->
+<div id="new-product-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="document.getElementById('new-product-modal').classList.add('hidden')"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto">
+    <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+    <h3 class="text-base font-bold text-gray-900 mb-5">New product</h3>
+    <form method="post" action="{% url 'product_create' %}" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Name</label>
+        <input type="text" name="name" placeholder="e.g. Tofu, Tempeh, Lentils…" required
+          class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400
+                 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-orange-400 uppercase tracking-widest mb-1.5">Kcal / 100g</label>
+          <input type="number" name="kcal_per_100g" placeholder="0" min="0" step="1" required
+            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-blue-400 uppercase tracking-widest mb-1.5">Protein / 100g</label>
+          <input type="number" name="protein_per_100g" placeholder="0" min="0" step="0.1" required
+            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400
+                   focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition">
+        </div>
+      </div>
+      <button type="submit"
+        class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors">
+        Save product
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+  let usePk = null, useKcal = 0, useProt = 0;
+
+  function openUseModal(pk, name, kcal, prot) {
+    usePk = pk; useKcal = kcal; useProt = prot;
+    document.getElementById('use-product-name').textContent = name;
+    document.getElementById('use-product-info').textContent = `${kcal} kcal · ${prot}g protein per 100g`;
+    document.getElementById('use-form').action = `/quick-add/product/${pk}/use/`;
+    document.getElementById('use-weight').value = 100;
+    updateUsePreview();
+    document.getElementById('use-modal').classList.remove('hidden');
+  }
+
+  function closeUseModal() {
+    document.getElementById('use-modal').classList.add('hidden');
+  }
+
+  function adjustUseWeight(delta) {
+    const el = document.getElementById('use-weight');
+    el.value = Math.max(1, (parseInt(el.value) || 0) + delta);
+    updateUsePreview();
+  }
+
+  function updateUsePreview() {
+    const w = parseFloat(document.getElementById('use-weight').value) || 0;
+    document.getElementById('use-preview').textContent =
+      `${(useKcal * w / 100).toFixed(0)} kcal · ${(useProt * w / 100).toFixed(1)}g protein`;
+  }
+
+  document.getElementById('use-weight').addEventListener('input', updateUsePreview);
+</script>
+{% endblock %}

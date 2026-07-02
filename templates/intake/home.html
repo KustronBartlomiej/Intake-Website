@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% block title %}Today — Intake{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  <!-- Date header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-xs font-medium text-gray-400 uppercase tracking-widest">Today</p>
+      <h1 class="text-xl font-bold text-gray-900">{{ today|date:"l, j F" }}</h1>
+    </div>
+    <a href="{% url 'add_meal' %}"
+      class="flex items-center gap-1.5 bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Add meal
+    </a>
+  </div>
+
+  <!-- Calories card -->
+  <a href="{% url 'detail' 'calories' %}" class="block bg-white rounded-2xl shadow-sm border border-gray-100 p-5 card-hover">
+    <div class="flex items-start justify-between mb-3">
+      <div>
+        <p class="text-xs font-semibold text-orange-400 uppercase tracking-widest">Calories</p>
+        <p class="text-3xl font-bold text-gray-900 mt-0.5">
+          {{ kcal_total|floatformat:0 }}
+          <span class="text-base font-normal text-gray-400">/ {{ kcal_goal }} kcal</span>
+        </p>
+      </div>
+      <span class="text-sm font-semibold text-orange-500 bg-orange-50 rounded-full px-3 py-1">
+        {{ kcal_pct }}%
+      </span>
+    </div>
+    <div class="h-2.5 bg-orange-100 rounded-full overflow-hidden">
+      <div class="progress-bar-fill h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full"
+           style="width: {{ kcal_pct }}%"></div>
+    </div>
+  </a>
+
+  <!-- Protein card -->
+  <a href="{% url 'detail' 'protein' %}" class="block bg-white rounded-2xl shadow-sm border border-gray-100 p-5 card-hover">
+    <div class="flex items-start justify-between mb-3">
+      <div>
+        <p class="text-xs font-semibold text-blue-400 uppercase tracking-widest">Protein</p>
+        <p class="text-3xl font-bold text-gray-900 mt-0.5">
+          {{ protein_total|floatformat:0 }}
+          <span class="text-base font-normal text-gray-400">/ {{ protein_goal }} g</span>
+        </p>
+      </div>
+      <span class="text-sm font-semibold text-blue-500 bg-blue-50 rounded-full px-3 py-1">
+        {{ protein_pct }}%
+      </span>
+    </div>
+    <div class="h-2.5 bg-blue-100 rounded-full overflow-hidden">
+      <div class="progress-bar-fill h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full"
+           style="width: {{ protein_pct }}%"></div>
+    </div>
+  </a>
+
+  <!-- Quick Add card -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="flex items-center justify-between px-5 pt-5 pb-3">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-green-400"></span>
+        <p class="text-xs font-semibold text-green-500 uppercase tracking-widest">Quick Add</p>
+      </div>
+      <a href="{% url 'quick_add' %}"
+        class="text-xs font-semibold text-gray-400 hover:text-gray-700 transition-colors">
+        Manage →
+      </a>
+    </div>
+
+    {% if products %}
+      <div class="px-5 pb-4 space-y-2" id="product-list">
+        {% for product in products %}
+          <div class="flex items-center justify-between gap-3 py-2 border-b border-gray-50 last:border-0" id="prow-{{ product.pk }}">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ product.name }}</p>
+              <p class="text-xs text-gray-400">{{ product.kcal_per_100g }} kcal · {{ product.protein_per_100g }}g protein / 100g</p>
+            </div>
+            <button onclick="openWeightModal({{ product.pk }}, '{{ product.name|escapejs }}')"
+              class="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-green-50 hover:bg-green-100 text-green-600 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14" stroke-width="2.2" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="px-5 pb-5 text-center">
+        <p class="text-sm text-gray-400">No products yet.</p>
+        <a href="{% url 'quick_add' %}" class="inline-block mt-2 text-sm font-semibold text-green-600 hover:text-green-700">
+          Add your first product →
+        </a>
+      </div>
+    {% endif %}
+
+    {% if quick_entries %}
+      <div class="border-t border-gray-100 px-5 py-3">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Recent today</p>
+        <div class="space-y-1">
+          {% for entry in quick_entries %}
+            <div class="flex items-center justify-between text-sm py-1">
+              <div>
+                <span class="font-medium text-gray-800">{{ entry.name }}</span>
+                <span class="text-gray-400 ml-2">{{ entry.weight_g|floatformat:0 }}g</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-gray-500 text-xs">{{ entry.total_kcal|floatformat:0 }} kcal · {{ entry.total_protein|floatformat:0 }}g</span>
+                <form method="post" action="{% url 'entry_delete' entry.pk %}" class="inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="/">
+                  <button type="submit" class="text-gray-300 hover:text-red-400 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M18 6L6 18M6 6l12 12" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Calendar shortcut -->
+  <a href="{% url 'calendar' %}"
+    class="flex items-center justify-between w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-4 card-hover">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="18" rx="2" stroke-width="1.8"/>
+          <path d="M16 2v4M8 2v4M3 10h18" stroke-width="1.8"/>
+        </svg>
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-gray-900">View other days</p>
+        <p class="text-xs text-gray-400">Browse history or add for future dates</p>
+      </div>
+    </div>
+    <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </a>
+
+</div>
+
+<!-- Weight modal -->
+<div id="weight-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="closeWeightModal()"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto">
+    <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+    <h3 class="text-base font-bold text-gray-900 mb-1" id="modal-product-name"></h3>
+    <p class="text-xs text-gray-400 mb-5">Enter weight in grams</p>
+
+    <form method="post" id="weight-form" action="">
+      {% csrf_token %}
+      <div class="flex items-center gap-3 mb-5">
+        <button type="button" onclick="adjustWeight(-10)"
+          class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold transition-colors flex items-center justify-center">−</button>
+        <input type="number" id="weight-input" name="weight_g" min="1" max="9999" value="100"
+          class="flex-1 text-center text-2xl font-bold text-gray-900 border border-gray-200 rounded-xl py-2.5
+                 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent">
+        <button type="button" onclick="adjustWeight(10)"
+          class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold transition-colors flex items-center justify-center">+</button>
+      </div>
+      <div id="weight-preview" class="text-center text-sm text-gray-500 mb-5 h-5"></div>
+      <button type="submit"
+        class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors">
+        Add to today
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+  const productData = {
+    {% for p in products %}
+    {{ p.pk }}: { kcal: {{ p.kcal_per_100g }}, protein: {{ p.protein_per_100g }} },
+    {% endfor %}
+  };
+
+  let currentPk = null;
+
+  function openWeightModal(pk, name) {
+    currentPk = pk;
+    document.getElementById('modal-product-name').textContent = name;
+    document.getElementById('weight-form').action = `/quick-add/product/${pk}/use/`;
+    document.getElementById('weight-input').value = 100;
+    updatePreview();
+    document.getElementById('weight-modal').classList.remove('hidden');
+  }
+
+  function closeWeightModal() {
+    document.getElementById('weight-modal').classList.add('hidden');
+  }
+
+  function adjustWeight(delta) {
+    const input = document.getElementById('weight-input');
+    const val = Math.max(1, (parseInt(input.value) || 0) + delta);
+    input.value = val;
+    updatePreview();
+  }
+
+  function updatePreview() {
+    if (!currentPk) return;
+    const w = parseFloat(document.getElementById('weight-input').value) || 0;
+    const d = productData[currentPk];
+    if (!d) return;
+    const kcal = (d.kcal * w / 100).toFixed(0);
+    const prot = (d.protein * w / 100).toFixed(1);
+    document.getElementById('weight-preview').textContent = `${kcal} kcal · ${prot}g protein`;
+  }
+
+  document.getElementById('weight-input').addEventListener('input', updatePreview);
+</script>
+{% endblock %}

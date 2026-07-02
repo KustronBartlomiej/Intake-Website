@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Intake{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            kcal: { light: '#fff7ed', mid: '#fed7aa', accent: '#f97316', dark: '#c2410c' },
+            prot: { light: '#eff6ff', mid: '#bfdbfe', accent: '#3b82f6', dark: '#1d4ed8' },
+            qadd: { light: '#f0fdf4', mid: '#bbf7d0', accent: '#22c55e', dark: '#15803d' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .progress-bar-fill { transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+    .card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .card-hover:hover { transform: translateY(-1px); box-shadow: 0 8px 25px -5px rgba(0,0,0,.1); }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-full">
+
+  {% if user.is_authenticated %}
+  <nav class="bg-white border-b border-gray-100 sticky top-0 z-10">
+    <div class="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
+      <a href="{% url 'home' %}" class="font-bold text-gray-900 text-lg tracking-tight">Intake</a>
+      <div class="flex items-center gap-3">
+        <a href="{% url 'calendar' %}" class="text-gray-400 hover:text-gray-700 transition-colors" title="Calendar">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" stroke-width="1.8"/>
+            <path d="M16 2v4M8 2v4M3 10h18" stroke-width="1.8"/>
+          </svg>
+        </a>
+        <a href="{% url 'settings' %}" class="text-gray-400 hover:text-gray-700 transition-colors" title="Settings">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" stroke-width="1.8"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke-width="1.8"/>
+          </svg>
+        </a>
+        <form method="post" action="{% url 'logout' %}" class="inline">
+          {% csrf_token %}
+          <button type="submit" class="text-gray-400 hover:text-gray-700 transition-colors" title="Log out">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  </nav>
+  {% endif %}
+
+  <main class="max-w-lg mx-auto px-4 py-6">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-xl text-sm font-medium
+          {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-100
+          {% else %}bg-green-50 text-green-700 border border-green-100{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

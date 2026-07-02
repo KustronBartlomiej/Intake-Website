@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% block title %}{{ target|date:"j F Y" }} — Intake{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <a href="{% url 'calendar' %}" class="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Calendar
+    </a>
+    <h1 class="text-base font-bold text-gray-900">
+      {% if target == today %}Today{% else %}{{ target|date:"l, j F" }}{% endif %}
+    </h1>
+    <a href="{% url 'add_meal_date' target|date:'Y-m-d' %}"
+      class="w-8 h-8 rounded-full bg-gray-900 hover:bg-gray-700 text-white flex items-center justify-center transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    </a>
+  </div>
+
+  <!-- Progress cards -->
+  <div class="grid grid-cols-2 gap-3">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-orange-400 uppercase tracking-widest mb-2">Calories</p>
+      <p class="text-2xl font-bold text-gray-900">{{ kcal_total|floatformat:0 }}</p>
+      <p class="text-xs text-gray-400 mb-2">/ {{ kcal_goal }} kcal</p>
+      <div class="h-2 bg-orange-100 rounded-full overflow-hidden">
+        <div class="h-full bg-orange-400 rounded-full progress-bar-fill" style="width: {{ kcal_pct }}%"></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-blue-400 uppercase tracking-widest mb-2">Protein</p>
+      <p class="text-2xl font-bold text-gray-900">{{ protein_total|floatformat:0 }}</p>
+      <p class="text-xs text-gray-400 mb-2">/ {{ protein_goal }} g</p>
+      <div class="h-2 bg-blue-100 rounded-full overflow-hidden">
+        <div class="h-full bg-blue-400 rounded-full progress-bar-fill" style="width: {{ protein_pct }}%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entries list -->
+  {% if entries %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-50">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Entries</p>
+      </div>
+      <div class="divide-y divide-gray-50">
+        {% for entry in entries %}
+          <div class="flex items-center px-5 py-3.5 gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ entry.name }}</p>
+              <p class="text-xs text-gray-400">{{ entry.weight_g|floatformat:0 }}g · {{ entry.kcal_per_100g }} kcal · {{ entry.protein_per_100g }}g prot / 100g</p>
+            </div>
+            <div class="text-right mr-2">
+              <p class="text-sm font-semibold text-gray-700">{{ entry.total_kcal|floatformat:0 }} kcal</p>
+              <p class="text-xs text-gray-400">{{ entry.total_protein|floatformat:1 }}g</p>
+            </div>
+            <form method="post" action="{% url 'entry_delete' entry.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{% url 'calendar_day' target|date:'Y-m-d' %}">
+              <button type="submit" class="text-gray-300 hover:text-red-400 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+      <p class="text-sm text-gray-400 mb-3">No entries for this day.</p>
+      <a href="{% url 'add_meal_date' target|date:'Y-m-d' %}"
+        class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-700 hover:text-gray-900">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Add meal
+      </a>
+    </div>
+  {% endif %}
+
+  <!-- Quick Add for this day -->
+  {% if products %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-50 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-green-400"></span>
+          <p class="text-xs font-semibold text-green-500 uppercase tracking-widest">Quick Add</p>
+        </div>
+        <span class="text-xs text-gray-400">adds to {{ target|date:"j F" }}</span>
+      </div>
+      <div class="divide-y divide-gray-50">
+        {% for product in products %}
+          <div class="flex items-center px-5 py-3 gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ product.name }}</p>
+              <p class="text-xs text-gray-400">{{ product.kcal_per_100g }} kcal · {{ product.protein_per_100g }}g / 100g</p>
+            </div>
+            <button onclick="openDayModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }})"
+              class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              Use
+            </button>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+
+<!-- Quick-add weight modal for this specific day -->
+<div id="day-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="closeDayModal()"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto">
+    <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+    <h3 class="text-base font-bold text-gray-900 mb-1" id="day-product-name"></h3>
+    <p class="text-xs text-gray-400 mb-5" id="day-product-info"></p>
+    <form method="post" id="day-use-form" action="">
+      {% csrf_token %}
+      <input type="hidden" name="weight_g" id="day-weight-hidden">
+      <div class="flex items-center gap-3 mb-3">
+        <button type="button" onclick="adjustDayWeight(-10)"
+          class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold flex items-center justify-center transition-colors">−</button>
+        <input type="number" id="day-weight-display" min="1" max="9999" value="100"
+          class="flex-1 text-center text-2xl font-bold text-gray-900 border border-gray-200 rounded-xl py-2.5
+                 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
+          oninput="updateDayPreview()">
+        <button type="button" onclick="adjustDayWeight(10)"
+          class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold flex items-center justify-center transition-colors">+</button>
+      </div>
+      <p class="text-center text-sm text-gray-500 mb-5 h-5" id="day-preview"></p>
+      <button type="submit"
+        class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors">
+        Add to {{ target|date:"j F" }}
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+  let dayPk = null, dayKcal = 0, dayProt = 0;
+  const targetDate = '{{ target|date:"Y-m-d" }}';
+
+  function openDayModal(pk, name, kcal, prot) {
+    dayPk = pk; dayKcal = kcal; dayProt = prot;
+    document.getElementById('day-product-name').textContent = name;
+    document.getElementById('day-product-info').textContent = `${kcal} kcal · ${prot}g protein per 100g`;
+    document.getElementById('day-weight-display').value = 100;
+
+    // POST to quick_add_use, but then we need to redirect back here.
+    // We'll use a custom add_meal endpoint for this day instead.
+    document.getElementById('day-use-form').action = `/quick-add/product/${pk}/use/?date=${targetDate}`;
+    updateDayPreview();
+    document.getElementById('day-modal').classList.remove('hidden');
+  }
+
+  function closeDayModal() {
+    document.getElementById('day-modal').classList.add('hidden');
+  }
+
+  function adjustDayWeight(delta) {
+    const el = document.getElementById('day-weight-display');
+    el.value = Math.max(1, (parseInt(el.value) || 0) + delta);
+    updateDayPreview();
+  }
+
+  function updateDayPreview() {
+    const w = parseFloat(document.getElementById('day-weight-display').value) || 0;
+    document.getElementById('day-weight-hidden').value = w;
+    document.getElementById('day-preview').textContent =
+      `${(dayKcal * w / 100).toFixed(0)} kcal · ${(dayProt * w / 100).toFixed(1)}g protein`;
+  }
+  updateDayPreview();
+</script>
+{% endblock %}

@@ -1,0 +1,9 @@
+DEPLOY_RAILWAY.txt
+venv/
+__pycache__/
+*.pyc
+db.sqlite3
+staticfiles/
+.env
+*.egg-info/
+.DS_Store

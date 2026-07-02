@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}{{ nutrient|title }} — Intake{% endblock %}
+
+{% block content %}
+{% if color == 'orange' %}
+  {% with accent="orange" bg="bg-orange-50" ring="stroke-orange-500" track="stroke-orange-100" badge="bg-orange-50 text-orange-600" btn="bg-orange-500 hover:bg-orange-600" %}
+    {% include 'intake/_detail_inner.html' %}
+  {% endwith %}
+{% else %}
+  {% with accent="blue" bg="bg-blue-50" ring="stroke-blue-500" track="stroke-blue-100" badge="bg-blue-50 text-blue-600" btn="bg-blue-500 hover:bg-blue-600" %}
+    {% include 'intake/_detail_inner.html' %}
+  {% endwith %}
+{% endif %}
+{% endblock %}

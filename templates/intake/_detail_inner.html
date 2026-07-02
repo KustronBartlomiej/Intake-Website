@@ -1,0 +1,148 @@
+<div class="space-y-5">
+
+  <!-- Back + goal button -->
+  <div class="flex items-center justify-between">
+    <a href="{% url 'home' %}" class="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Back
+    </a>
+    <button onclick="document.getElementById('goal-modal').classList.remove('hidden')"
+      class="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" stroke-width="1.8"/>
+        <path d="M12 8v4l3 3" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      Set goal
+    </button>
+  </div>
+
+  <!-- Circular gauge -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center">
+    <p class="text-xs font-semibold uppercase tracking-widest
+      {% if color == 'orange' %}text-orange-400{% else %}text-blue-400{% endif %} mb-4">
+      {{ nutrient|title }}
+    </p>
+
+    <div class="relative w-52 h-52">
+      <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100">
+        <!-- Track -->
+        <circle cx="50" cy="50" r="42"
+          class="{{ track }}"
+          stroke-width="8" fill="none"/>
+        <!-- Progress -->
+        <circle cx="50" cy="50" r="42"
+          class="{{ ring }}"
+          stroke-width="8" fill="none"
+          stroke-linecap="round"
+          stroke-dasharray="263.9"
+          stroke-dashoffset="{{ dash_offset }}"
+          id="gauge-circle"/>
+      </svg>
+      <div class="absolute inset-0 flex flex-col items-center justify-center">
+        <span class="text-4xl font-bold text-gray-900" id="gauge-pct">{{ pct }}%</span>
+        <span class="text-xs text-gray-400 mt-1">of daily goal</span>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between w-full mt-4 px-2">
+      <div class="text-center">
+        <p class="text-2xl font-bold text-gray-900">{{ total|floatformat:0 }}</p>
+        <p class="text-xs text-gray-400">{{ unit }} consumed</p>
+      </div>
+      <div class="w-px h-10 bg-gray-100"></div>
+      <div class="text-center">
+        <p class="text-2xl font-bold text-gray-900">{{ goal }}</p>
+        <p class="text-xs text-gray-400">{{ unit }} goal</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action buttons -->
+  <div class="grid grid-cols-2 gap-3">
+    <a href="{% url 'add_meal' %}"
+      class="flex items-center justify-center gap-2 {{ btn }} text-white font-semibold py-3 rounded-xl transition-colors text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Add meal
+    </a>
+    <a href="{% url 'entry_list' nutrient %}"
+      class="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl transition-colors text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      Entries
+    </a>
+  </div>
+
+  <!-- Entry list preview -->
+  {% if entries %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-50">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Today's entries</p>
+      </div>
+      <div class="divide-y divide-gray-50">
+        {% for entry in entries %}
+          <div class="flex items-center justify-between px-5 py-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ entry.name }}</p>
+              <p class="text-xs text-gray-400">{{ entry.weight_g|floatformat:0 }}g · {{ entry.kcal_per_100g }} kcal/100g</p>
+            </div>
+            <div class="flex items-center gap-3 ml-3">
+              {% if nutrient == 'calories' %}
+                <span class="text-sm font-semibold text-gray-700">{{ entry.total_kcal|floatformat:0 }} kcal</span>
+              {% else %}
+                <span class="text-sm font-semibold text-gray-700">{{ entry.total_protein|floatformat:1 }}g</span>
+              {% endif %}
+              <form method="post" action="{% url 'entry_delete' entry.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="text-gray-300 hover:text-red-400 transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M18 6L6 18M6 6l12 12" stroke-width="1.8" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <div class="text-center py-6 text-sm text-gray-400">No entries yet today.</div>
+  {% endif %}
+
+</div>
+
+<!-- Set goal modal -->
+<div id="goal-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="document.getElementById('goal-modal').classList.add('hidden')"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto">
+    <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+    <h3 class="text-base font-bold text-gray-900 mb-1">Daily {{ nutrient }} goal</h3>
+    <p class="text-xs text-gray-400 mb-5">Currently set to <strong>{{ goal }} {{ unit }}</strong></p>
+    <form method="post" action="{% url 'set_goal' nutrient %}">
+      {% csrf_token %}
+      <input type="number" name="goal" value="{{ goal }}" min="1" required
+        class="w-full text-center text-2xl font-bold text-gray-900 border border-gray-200 rounded-xl py-3 mb-4
+               focus:outline-none focus:ring-2
+               {% if color == 'orange' %}focus:ring-orange-400{% else %}focus:ring-blue-400{% endif %}
+               focus:border-transparent">
+      <button type="submit"
+        class="w-full {{ btn }} text-white font-semibold py-3 rounded-xl transition-colors">
+        Save goal
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Calculate SVG dash offset: circumference = 2π×42 ≈ 263.9
+  const pct = {{ pct }};
+  const circ = 263.9;
+  document.getElementById('gauge-circle').setAttribute(
+    'stroke-dashoffset', circ - (pct / 100) * circ
+  );
+</script>

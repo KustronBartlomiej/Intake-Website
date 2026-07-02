@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% block title %}Add Meal — Intake{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <a href="{% url 'home' %}" class="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Back
+    </a>
+    <h1 class="text-base font-bold text-gray-900">Add Meal</h1>
+    <div class="w-10"></div>
+  </div>
+
+  <!-- Step indicator -->
+  <div class="flex items-center gap-2">
+    <div id="step-dot-1" class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-bold flex items-center justify-center">1</div>
+      <span class="text-sm font-semibold text-gray-900">Nutrition per 100g</span>
+    </div>
+    <div class="flex-1 h-px bg-gray-200 mx-2"></div>
+    <div id="step-dot-2" class="flex items-center gap-2 opacity-40">
+      <div class="w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-bold flex items-center justify-center">2</div>
+      <span class="text-sm font-semibold text-gray-900">Weight</span>
+    </div>
+  </div>
+
+  <form method="post" action="{% url 'add_meal' %}" id="meal-form">
+    {% csrf_token %}
+    <input type="hidden" name="entry_date" id="entry-date-input" value="{{ target_date }}">
+
+    <!-- Step 1 -->
+    <div id="step1" class="space-y-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Meal name</label>
+          <input type="text" id="meal-name" name="name" placeholder="e.g. Tofu, Tempeh, Lentils…"
+            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400
+                   focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent transition">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-orange-400 uppercase tracking-widest mb-2">Calories / 100g</label>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="adjust('kcal', -10)"
+              class="w-11 h-11 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 text-xl font-semibold transition-colors flex items-center justify-center">−</button>
+            <input type="number" id="kcal-input" name="kcal_per_100g" value="0" min="0" max="9000" step="1"
+              class="flex-1 text-center text-2xl font-bold text-gray-900 border border-gray-200 rounded-xl py-2.5
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              oninput="syncInputs()">
+            <button type="button" onclick="adjust('kcal', 10)"
+              class="w-11 h-11 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 text-xl font-semibold transition-colors flex items-center justify-center">+</button>
+          </div>
+          <p class="text-center text-xs text-gray-400 mt-1">kcal per 100g</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-blue-400 uppercase tracking-widest mb-2">Protein / 100g</label>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="adjust('protein', -5)"
+              class="w-11 h-11 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 text-xl font-semibold transition-colors flex items-center justify-center">−</button>
+            <input type="number" id="protein-input" name="protein_per_100g" value="0" min="0" max="100" step="0.1"
+              class="flex-1 text-center text-2xl font-bold text-gray-900 border border-gray-200 rounded-xl py-2.5
+                     focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+              oninput="syncInputs()">
+            <button type="button" onclick="adjust('protein', 5)"
+              class="w-11 h-11 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 text-xl font-semibold transition-colors flex items-center justify-center">+</button>
+          </div>
+          <p class="text-center text-xs text-gray-400 mt-1">grams per 100g</p>
+        </div>
+      </div>
+
+      <!-- Date picker (for other day) -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Date</label>
+        <input type="date" id="date-picker" value="{{ target_date }}"
+          max="{{ today|date:'Y-m-d' }}"
+          class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700
+                 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent transition"
+          onchange="document.getElementById('entry-date-input').value = this.value">
+        <p class="text-xs text-gray-400 mt-1.5">You can also log meals for past or future dates</p>
+      </div>
+
+      <button type="button" onclick="goStep2()"
+        class="w-full bg-gray-900 hover:bg-gray-700 text-white font-semibold py-3.5 rounded-xl transition-colors">
+        Next →
+      </button>
+    </div>
+
+    <!-- Step 2 -->
+    <div id="step2" class="space-y-4 hidden">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Weight (grams)</label>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="adjust('weight', -10)"
+            class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold transition-colors flex items-center justify-center">−</button>
+          <input type="number" id="weight-input" name="weight_g" value="100" min="1" max="9999" step="1"
+            class="flex-1 text-center text-2xl font-bold text-gray-900 border border-gray-200 rounded-xl py-2.5
+                   focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+            oninput="updatePreview()">
+          <button type="button" onclick="adjust('weight', 10)"
+            class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold transition-colors flex items-center justify-center">+</button>
+        </div>
+        <p class="text-center text-xs text-gray-400 mt-1">grams</p>
+      </div>
+
+      <!-- Live preview -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-orange-50 rounded-2xl p-4 text-center">
+          <p class="text-xs font-semibold text-orange-400 uppercase tracking-widest mb-1">Calories</p>
+          <p class="text-2xl font-bold text-gray-900" id="preview-kcal">0</p>
+          <p class="text-xs text-gray-400">kcal</p>
+        </div>
+        <div class="bg-blue-50 rounded-2xl p-4 text-center">
+          <p class="text-xs font-semibold text-blue-400 uppercase tracking-widest mb-1">Protein</p>
+          <p class="text-2xl font-bold text-gray-900" id="preview-protein">0</p>
+          <p class="text-xs text-gray-400">grams</p>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button type="button" onclick="goStep1()"
+          class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3.5 rounded-xl transition-colors">
+          ← Back
+        </button>
+        <button type="submit"
+          class="flex-1 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-3.5 rounded-xl transition-colors">
+          Save meal
+        </button>
+      </div>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  function adjust(field, delta) {
+    if (field === 'kcal') {
+      const el = document.getElementById('kcal-input');
+      el.value = Math.max(0, (parseFloat(el.value) || 0) + delta);
+    } else if (field === 'protein') {
+      const el = document.getElementById('protein-input');
+      el.value = Math.max(0, Math.round(((parseFloat(el.value) || 0) + delta) * 10) / 10);
+    } else if (field === 'weight') {
+      const el = document.getElementById('weight-input');
+      el.value = Math.max(1, (parseInt(el.value) || 0) + delta);
+      updatePreview();
+    }
+  }
+
+  function syncInputs() { /* already bound via oninput */ }
+
+  function updatePreview() {
+    const kcal100 = parseFloat(document.getElementById('kcal-input').value) || 0;
+    const prot100 = parseFloat(document.getElementById('protein-input').value) || 0;
+    const w = parseFloat(document.getElementById('weight-input').value) || 0;
+    document.getElementById('preview-kcal').textContent = (kcal100 * w / 100).toFixed(0);
+    document.getElementById('preview-protein').textContent = (prot100 * w / 100).toFixed(1);
+  }
+
+  function goStep2() {
+    document.getElementById('step1').classList.add('hidden');
+    document.getElementById('step2').classList.remove('hidden');
+    document.getElementById('step-dot-1').classList.add('opacity-40');
+    document.getElementById('step-dot-2').classList.remove('opacity-40');
+    updatePreview();
+  }
+
+  function goStep1() {
+    document.getElementById('step2').classList.add('hidden');
+    document.getElementById('step1').classList.remove('hidden');
+    document.getElementById('step-dot-2').classList.add('opacity-40');
+    document.getElementById('step-dot-1').classList.remove('opacity-40');
+  }
+
+  // Allow dates in the future too (remove max)
+  document.getElementById('date-picker').removeAttribute('max');
+</script>
+{% endblock %}
