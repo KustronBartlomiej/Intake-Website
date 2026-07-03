@@ -56,15 +56,29 @@ class FoodEntry(models.Model):
         return f'{self.name} ({self.date}) — {self.user.username}'
 
 
-class QuickAddProduct(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
-    name = models.CharField(max_length=200)
-    kcal_per_100g = models.DecimalField(max_digits=7, decimal_places=1)
-    protein_per_100g = models.DecimalField(max_digits=6, decimal_places=1)
+class ProductList(models.Model):
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_lists')
+    name = models.CharField(max_length=100)
+    is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['name']
 
     def __str__(self):
-        return f'{self.name} — {self.user.username}'
+        return f'{self.name} ({self.owner.username})'
+
+
+class QuickAddProduct(models.Model):
+    product_list = models.ForeignKey(ProductList, on_delete=models.CASCADE, related_name='products')
+    name = models.CharField(max_length=200)
+    kcal_per_100g = models.DecimalField(max_digits=7, decimal_places=1)
+    protein_per_100g = models.DecimalField(max_digits=6, decimal_places=1)
+    default_weight_g = models.DecimalField(max_digits=7, decimal_places=1, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f'{self.name} — {self.product_list.owner.username}'

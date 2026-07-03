@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% block title %}Product Lists — Intake{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <a href="{% url 'home' %}" class="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Back
+    </a>
+    <h1 class="text-base font-bold text-gray-900">Product Lists</h1>
+    <button onclick="document.getElementById('new-list-modal').classList.remove('hidden')"
+      class="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Browse public lists -->
+  <a href="{% url 'public_lists' %}"
+    class="flex items-center justify-between w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-4 card-hover">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
+        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" stroke-width="1.8"/>
+          <path d="M21 21l-4.3-4.3" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-gray-900">Browse public lists</p>
+        <p class="text-xs text-gray-400">Find and copy lists shared by others</p>
+      </div>
+    </div>
+    <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </a>
+
+  <!-- Your lists -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-50">
+      <p class="text-xs font-semibold text-green-500 uppercase tracking-widest">Your lists</p>
+    </div>
+    {% if lists %}
+      <div class="divide-y divide-gray-50">
+        {% for list in lists %}
+          <a href="{% url 'product_list_detail' list.pk %}" class="flex items-center px-5 py-3.5 gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ list.name }}</p>
+              <p class="text-xs text-gray-400">
+                {{ list.product_count }} product{{ list.product_count|pluralize }}{% if list.is_public %} · Public{% endif %}
+              </p>
+            </div>
+            <svg class="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="px-5 py-8 text-center">
+        <p class="text-sm text-gray-400 mb-3">No lists yet.</p>
+        <button onclick="document.getElementById('new-list-modal').classList.remove('hidden')"
+          class="text-sm font-semibold text-green-600 hover:text-green-700">
+          Create your first list →
+        </button>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Recent today -->
+  {% if recent %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-50">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Recent today</p>
+      </div>
+      <div class="divide-y divide-gray-50">
+        {% for entry in recent %}
+          <div class="flex items-center px-5 py-3 gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ entry.name }}</p>
+              <p class="text-xs text-gray-400">{{ entry.weight_g|floatformat:0 }}g</p>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-semibold text-gray-700">{{ entry.total_kcal|floatformat:0 }} kcal</p>
+              <p class="text-xs text-gray-400">{{ entry.total_protein|floatformat:1 }}g protein</p>
+            </div>
+            <form method="post" action="{% url 'entry_delete' entry.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{% url 'product_lists' %}">
+              <button type="submit" class="text-gray-300 hover:text-red-400 transition-colors ml-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+
+<!-- New list modal -->
+<div id="new-list-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="document.getElementById('new-list-modal').classList.add('hidden')"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto">
+    <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+    <h3 class="text-base font-bold text-gray-900 mb-5">New list</h3>
+    <form method="post" action="{% url 'product_list_create' %}" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Name</label>
+        <input type="text" name="name" placeholder="e.g. Breakfast staples, Snacks…" required
+          class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400
+                 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition">
+      </div>
+      <label class="flex items-center gap-2.5 text-sm text-gray-600">
+        <input type="checkbox" name="is_public" class="w-4 h-4 rounded border-gray-300 text-green-500 focus:ring-green-400">
+        Make this list public
+      </label>
+      <button type="submit"
+        class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors">
+        Create list
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

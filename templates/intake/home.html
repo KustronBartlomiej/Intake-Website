@@ -64,36 +64,34 @@
     <div class="flex items-center justify-between px-5 pt-5 pb-3">
       <div class="flex items-center gap-2">
         <span class="w-2 h-2 rounded-full bg-green-400"></span>
-        <p class="text-xs font-semibold text-green-500 uppercase tracking-widest">Quick Add</p>
+        <p class="text-xs font-semibold text-green-500 uppercase tracking-widest">Product Lists</p>
       </div>
-      <a href="{% url 'quick_add' %}"
+      <a href="{% url 'product_lists' %}"
         class="text-xs font-semibold text-gray-400 hover:text-gray-700 transition-colors">
         Manage →
       </a>
     </div>
 
-    {% if products %}
-      <div class="px-5 pb-4 space-y-2" id="product-list">
-        {% for product in products %}
-          <div class="flex items-center justify-between gap-3 py-2 border-b border-gray-50 last:border-0" id="prow-{{ product.pk }}">
+    {% if lists %}
+      <div class="px-5 pb-4 space-y-2">
+        {% for list in lists %}
+          <a href="{% url 'product_list_detail' list.pk %}"
+            class="flex items-center justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold text-gray-900 truncate">{{ product.name }}</p>
-              <p class="text-xs text-gray-400">{{ product.kcal_per_100g }} kcal · {{ product.protein_per_100g }}g protein / 100g</p>
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ list.name }}</p>
+              <p class="text-xs text-gray-400">{{ list.product_count }} product{{ list.product_count|pluralize }}{% if list.is_public %} · Public{% endif %}</p>
             </div>
-            <button onclick="openWeightModal({{ product.pk }}, '{{ product.name|escapejs }}')"
-              class="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-green-50 hover:bg-green-100 text-green-600 transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M12 5v14M5 12h14" stroke-width="2.2" stroke-linecap="round"/>
-              </svg>
-            </button>
-          </div>
+            <svg class="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </a>
         {% endfor %}
       </div>
     {% else %}
       <div class="px-5 pb-5 text-center">
-        <p class="text-sm text-gray-400">No products yet.</p>
-        <a href="{% url 'quick_add' %}" class="inline-block mt-2 text-sm font-semibold text-green-600 hover:text-green-700">
-          Add your first product →
+        <p class="text-sm text-gray-400">No product lists yet.</p>
+        <a href="{% url 'product_lists' %}" class="inline-block mt-2 text-sm font-semibold text-green-600 hover:text-green-700">
+          Create your first list →
         </a>
       </div>
     {% endif %}
@@ -148,74 +146,4 @@
   </a>
 
 </div>
-
-<!-- Weight modal -->
-<div id="weight-modal" class="fixed inset-0 z-50 hidden">
-  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="closeWeightModal()"></div>
-  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto">
-    <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
-    <h3 class="text-base font-bold text-gray-900 mb-1" id="modal-product-name"></h3>
-    <p class="text-xs text-gray-400 mb-5">Enter weight in grams</p>
-
-    <form method="post" id="weight-form" action="">
-      {% csrf_token %}
-      <div class="flex items-center gap-3 mb-5">
-        <button type="button" onclick="adjustWeight(-10)"
-          class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold transition-colors flex items-center justify-center">−</button>
-        <input type="number" id="weight-input" name="weight_g" min="1" max="9999" value="100"
-          class="flex-1 text-center text-2xl font-bold text-gray-900 border border-gray-200 rounded-xl py-2.5
-                 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent">
-        <button type="button" onclick="adjustWeight(10)"
-          class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold transition-colors flex items-center justify-center">+</button>
-      </div>
-      <div id="weight-preview" class="text-center text-sm text-gray-500 mb-5 h-5"></div>
-      <button type="submit"
-        class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors">
-        Add to today
-      </button>
-    </form>
-  </div>
-</div>
-
-<script>
-  const productData = {
-    {% for p in products %}
-    {{ p.pk }}: { kcal: {{ p.kcal_per_100g }}, protein: {{ p.protein_per_100g }} },
-    {% endfor %}
-  };
-
-  let currentPk = null;
-
-  function openWeightModal(pk, name) {
-    currentPk = pk;
-    document.getElementById('modal-product-name').textContent = name;
-    document.getElementById('weight-form').action = `/quick-add/product/${pk}/use/`;
-    document.getElementById('weight-input').value = 100;
-    updatePreview();
-    document.getElementById('weight-modal').classList.remove('hidden');
-  }
-
-  function closeWeightModal() {
-    document.getElementById('weight-modal').classList.add('hidden');
-  }
-
-  function adjustWeight(delta) {
-    const input = document.getElementById('weight-input');
-    const val = Math.max(1, (parseInt(input.value) || 0) + delta);
-    input.value = val;
-    updatePreview();
-  }
-
-  function updatePreview() {
-    if (!currentPk) return;
-    const w = parseFloat(document.getElementById('weight-input').value) || 0;
-    const d = productData[currentPk];
-    if (!d) return;
-    const kcal = (d.kcal * w / 100).toFixed(0);
-    const prot = (d.protein * w / 100).toFixed(1);
-    document.getElementById('weight-preview').textContent = `${kcal} kcal · ${prot}g protein`;
-  }
-
-  document.getElementById('weight-input').addEventListener('input', updatePreview);
-</script>
 {% endblock %}

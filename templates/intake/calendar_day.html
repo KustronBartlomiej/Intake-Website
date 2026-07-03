@@ -103,10 +103,21 @@
               <p class="text-sm font-semibold text-gray-900 truncate">{{ product.name }}</p>
               <p class="text-xs text-gray-400">{{ product.kcal_per_100g }} kcal · {{ product.protein_per_100g }}g / 100g</p>
             </div>
-            <button onclick="openDayModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }})"
-              class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
-              Use
-            </button>
+            {% if product.default_weight_g %}
+              <form method="post" action="{% url 'quick_add_use' product.pk %}?date={{ target|date:'Y-m-d' }}">
+                {% csrf_token %}
+                <input type="hidden" name="weight_g" value="{{ product.default_weight_g }}">
+                <button type="submit"
+                  class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                  Add {{ product.default_weight_g|floatformat:0 }}g
+                </button>
+              </form>
+            {% else %}
+              <button onclick="openDayModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }})"
+                class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                Use
+              </button>
+            {% endif %}
           </div>
         {% endfor %}
       </div>

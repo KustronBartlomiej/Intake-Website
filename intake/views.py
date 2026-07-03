@@ -4,12 +4,22 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .models import FoodEntry, QuickAddProduct
+from .models import FoodEntry, ProductList, QuickAddProduct
+
+
+def _parse_decimal(raw):
+    raw = (raw or '').strip()
+    if not raw:
+        return None
+    try:
+        return Decimal(raw)
+    except Exception:
+        return None
 
 
 def _day_summary(user, day):
@@ -32,7 +42,7 @@ def home(request):
 
     today_entries = FoodEntry.objects.filter(user=request.user, date=today)
     quick_entries = today_entries.filter(source=FoodEntry.SOURCE_QUICK)
-    products = QuickAddProduct.objects.filter(user=request.user)
+    lists = ProductList.objects.filter(owner=request.user).annotate(product_count=Count('products'))
 
     return render(request, 'intake/home.html', {
         'today': today,
@@ -43,7 +53,7 @@ def home(request):
         'kcal_pct': kcal_pct,
         'protein_pct': protein_pct,
         'quick_entries': quick_entries,
-        'products': products,
+        'lists': lists,
     })
 
 
@@ -146,14 +156,39 @@ def add_meal(request, target_date=None):
     })
 
 
-# ── Quick Add ─────────────────────────────────────────────────────────────────
+# ── Product Lists ────────────────────────────────────────────────────────────
 
 @login_required
-def quick_add(request):
+def product_lists(request):
     today = date.today()
-    products = QuickAddProduct.objects.filter(user=request.user)
+    lists = ProductList.objects.filter(owner=request.user).annotate(product_count=Count('products'))
     recent = FoodEntry.objects.filter(user=request.user, date=today, source=FoodEntry.SOURCE_QUICK)
-    return render(request, 'intake/quick_add.html', {
+    return render(request, 'intake/product_lists.html', {
+        'lists': lists,
+        'recent': recent,
+        'today': today,
+    })
+
+
+@login_required
+@require_POST
+def product_list_create(request):
+    name = request.POST.get('name', '').strip()
+    is_public = request.POST.get('is_public') == 'on'
+    if name:
+        plist = ProductList.objects.create(owner=request.user, name=name, is_public=is_public)
+        return redirect('product_list_detail', pk=plist.pk)
+    return redirect('product_lists')
+
+
+@login_required
+def product_list_detail(request, pk):
+    plist = get_object_or_404(ProductList, pk=pk, owner=request.user)
+    today = date.today()
+    products = plist.products.all()
+    recent = FoodEntry.objects.filter(user=request.user, date=today, source=FoodEntry.SOURCE_QUICK)
+    return render(request, 'intake/product_list_detail.html', {
+        'plist': plist,
         'products': products,
         'recent': recent,
         'today': today,
@@ -162,40 +197,117 @@ def quick_add(request):
 
 @login_required
 @require_POST
-def quick_add_product_create(request):
+def product_list_rename(request, pk):
+    plist = get_object_or_404(ProductList, pk=pk, owner=request.user)
     name = request.POST.get('name', '').strip()
-    try:
-        kcal_per_100g = Decimal(request.POST.get('kcal_per_100g', '0'))
-        protein_per_100g = Decimal(request.POST.get('protein_per_100g', '0'))
-    except Exception:
-        return redirect('quick_add')
+    if name:
+        plist.name = name
+        plist.save()
+    return redirect('product_list_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def product_list_toggle_public(request, pk):
+    plist = get_object_or_404(ProductList, pk=pk, owner=request.user)
+    plist.is_public = not plist.is_public
+    plist.save()
+    return redirect('product_list_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def product_list_delete(request, pk):
+    plist = get_object_or_404(ProductList, pk=pk, owner=request.user)
+    plist.delete()
+    return redirect('product_lists')
+
+
+@login_required
+def public_lists(request):
+    q = request.GET.get('q', '').strip()
+    lists = (
+        ProductList.objects
+        .filter(is_public=True)
+        .exclude(owner=request.user)
+        .annotate(product_count=Count('products'))
+        .select_related('owner')
+    )
+    if q:
+        lists = lists.filter(owner__username__icontains=q)
+    return render(request, 'intake/public_lists.html', {'lists': lists, 'q': q})
+
+
+@login_required
+@require_POST
+def product_list_clone(request, pk):
+    source = get_object_or_404(ProductList, pk=pk, is_public=True)
+    clone = ProductList.objects.create(owner=request.user, name=source.name, is_public=False)
+    for p in source.products.all():
+        QuickAddProduct.objects.create(
+            product_list=clone,
+            name=p.name,
+            kcal_per_100g=p.kcal_per_100g,
+            protein_per_100g=p.protein_per_100g,
+            default_weight_g=p.default_weight_g,
+        )
+    return redirect('product_list_detail', pk=clone.pk)
+
+
+# ── Products within a list ───────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def quick_add_product_create(request, pk):
+    plist = get_object_or_404(ProductList, pk=pk, owner=request.user)
+    name = request.POST.get('name', '').strip()
+    kcal_per_100g = _parse_decimal(request.POST.get('kcal_per_100g')) or Decimal('0')
+    protein_per_100g = _parse_decimal(request.POST.get('protein_per_100g')) or Decimal('0')
+    default_weight_g = _parse_decimal(request.POST.get('default_weight_g'))
 
     if name:
         QuickAddProduct.objects.create(
-            user=request.user,
+            product_list=plist,
             name=name,
             kcal_per_100g=kcal_per_100g,
             protein_per_100g=protein_per_100g,
+            default_weight_g=default_weight_g,
         )
-    return redirect('quick_add')
+    return redirect('product_list_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def quick_add_product_edit(request, pk):
+    product = get_object_or_404(QuickAddProduct, pk=pk, product_list__owner=request.user)
+    name = request.POST.get('name', '').strip()
+    kcal_per_100g = _parse_decimal(request.POST.get('kcal_per_100g'))
+    protein_per_100g = _parse_decimal(request.POST.get('protein_per_100g'))
+    default_weight_g = _parse_decimal(request.POST.get('default_weight_g'))
+
+    if name and kcal_per_100g is not None and protein_per_100g is not None:
+        product.name = name
+        product.kcal_per_100g = kcal_per_100g
+        product.protein_per_100g = protein_per_100g
+        product.default_weight_g = default_weight_g
+        product.save()
+    return redirect('product_list_detail', pk=product.product_list_id)
 
 
 @login_required
 @require_POST
 def quick_add_product_delete(request, pk):
-    product = get_object_or_404(QuickAddProduct, pk=pk, user=request.user)
+    product = get_object_or_404(QuickAddProduct, pk=pk, product_list__owner=request.user)
+    list_pk = product.product_list_id
     product.delete()
-    return redirect('quick_add')
+    return redirect('product_list_detail', pk=list_pk)
 
 
 @login_required
 @require_POST
 def quick_add_use(request, pk):
-    product = get_object_or_404(QuickAddProduct, pk=pk, user=request.user)
-    try:
-        weight_g = Decimal(request.POST.get('weight_g', '0'))
-    except Exception:
-        return redirect('quick_add')
+    product = get_object_or_404(QuickAddProduct, pk=pk, product_list__owner=request.user)
+    weight_g = _parse_decimal(request.POST.get('weight_g')) or product.default_weight_g
 
     date_param = request.GET.get('date') or request.POST.get('date')
     try:
@@ -203,7 +315,7 @@ def quick_add_use(request, pk):
     except ValueError:
         entry_date = date.today()
 
-    if weight_g > 0:
+    if weight_g and weight_g > 0:
         FoodEntry.objects.create(
             user=request.user,
             date=entry_date,
@@ -216,7 +328,7 @@ def quick_add_use(request, pk):
 
     if str(entry_date) != str(date.today()):
         return redirect('calendar_day', day=str(entry_date))
-    return redirect('quick_add')
+    return redirect('product_list_detail', pk=product.product_list_id)
 
 
 # ── Delete Entry ──────────────────────────────────────────────────────────────
@@ -327,7 +439,7 @@ def calendar_day(request, day):
     protein_total = sum(e.total_protein for e in entries)
     kcal_pct = min(round(kcal_total / profile.kcal_goal * 100) if profile.kcal_goal else 0, 100)
     protein_pct = min(round(protein_total / profile.protein_goal * 100) if profile.protein_goal else 0, 100)
-    products = QuickAddProduct.objects.filter(user=request.user)
+    products = QuickAddProduct.objects.filter(product_list__owner=request.user)
 
     return render(request, 'intake/calendar_day.html', {
         'target': target,

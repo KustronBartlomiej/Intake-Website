@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Public Lists — Intake{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <a href="{% url 'product_lists' %}" class="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Lists
+    </a>
+    <h1 class="text-base font-bold text-gray-900">Public Lists</h1>
+    <div class="w-10"></div>
+  </div>
+
+  <!-- Search -->
+  <form method="get" class="relative">
+    <svg class="w-4 h-4 text-gray-300 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="7" stroke-width="1.8"/>
+      <path d="M21 21l-4.3-4.3" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <input type="text" name="q" value="{{ q }}" placeholder="Search by creator username…"
+      class="w-full rounded-xl border border-gray-200 pl-11 pr-4 py-3 text-sm text-gray-900 placeholder-gray-400
+             focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition">
+  </form>
+
+  <!-- Results -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    {% if lists %}
+      <div class="divide-y divide-gray-50">
+        {% for list in lists %}
+          <div class="flex items-center px-5 py-3.5 gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ list.name }}</p>
+              <p class="text-xs text-gray-400">by {{ list.owner.username }} · {{ list.product_count }} product{{ list.product_count|pluralize }}</p>
+            </div>
+            <form method="post" action="{% url 'product_list_clone' list.pk %}">
+              {% csrf_token %}
+              <button type="submit"
+                class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                Add as mine
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="px-5 py-8 text-center">
+        <p class="text-sm text-gray-400">
+          {% if q %}No public lists from a creator matching "{{ q }}".{% else %}No public lists yet.{% endif %}
+        </p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
