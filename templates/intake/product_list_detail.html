@@ -72,20 +72,19 @@
                 {% if product.default_weight_g %} · saves {{ product.default_weight_g|floatformat:0 }}g{% endif %}
               </p>
             </div>
+            <button onclick="event.stopPropagation(); openUseModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }})"
+              class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              Use
+            </button>
             {% if product.default_weight_g %}
               <form method="post" action="{% url 'quick_add_use' product.pk %}" onclick="event.stopPropagation()">
                 {% csrf_token %}
                 <input type="hidden" name="weight_g" value="{{ product.default_weight_g }}">
                 <button type="submit"
-                  class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
-                  Add {{ product.default_weight_g|floatformat:0 }}g
+                  class="shrink-0 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                  {{ product.default_weight_g|floatformat:0 }}g
                 </button>
               </form>
-            {% else %}
-              <button onclick="event.stopPropagation(); openUseModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }})"
-                class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
-                Use
-              </button>
             {% endif %}
             <form method="post" action="{% url 'product_delete' product.pk %}" class="inline"
               onsubmit="return confirm('Delete {{ product.name|escapejs }}?')" onclick="event.stopPropagation()">
