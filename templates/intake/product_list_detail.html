@@ -55,14 +55,61 @@
     </form>
   </div>
 
-  <!-- Products -->
-  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+  <!-- Product search -->
+  <form method="get" class="relative">
+    <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="7" stroke-width="1.8"/><path d="M20 20l-4-4" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <input type="search" name="q" value="{{ q }}" placeholder="Search products by name…" aria-label="Search products by name"
+      class="w-full rounded-xl border border-gray-200 bg-white pl-10 pr-10 py-3 text-sm text-gray-900 placeholder-gray-400 shadow-sm
+             focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition">
+    {% if q %}
+      <a href="{% url 'product_list_detail' plist.pk %}" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700" aria-label="Clear search">×</a>
+    {% endif %}
+  </form>
+
+  <!-- Mobile alphabet navigator -->
+  <nav class="sm:hidden sticky top-16 z-[5] -mx-1 px-1" aria-label="Product initials">
+    <div class="no-scrollbar bg-white/95 backdrop-blur border border-gray-100 shadow-sm rounded-2xl px-2 py-2 flex items-center gap-1 overflow-x-auto overscroll-x-contain">
+      {% for letter in alphabet %}
+        {% if letter in available_initials %}
+          <button type="button" data-letter="{{ letter }}"
+            class="alphabet-letter shrink-0 w-7 h-7 rounded-lg text-[11px] font-bold text-green-600 hover:bg-green-50 focus:outline-none focus:bg-green-50 transition-colors">
+            {{ letter }}
+          </button>
+        {% else %}
+          <span class="shrink-0 w-6 h-7 flex items-center justify-center text-[10px] font-medium text-gray-300">{{ letter }}</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </nav>
+
+  <!-- Products and alphabet navigator -->
+  <div class="relative">
+    <nav id="alphabet-nav"
+      class="hidden sm:flex fixed top-20 left-[calc(50%_-_18rem)] z-[5] w-9 py-2.5 rounded-2xl bg-white/95 backdrop-blur border border-gray-100 shadow-sm flex-col items-center gap-px"
+      aria-label="Product initials">
+      {% for letter in alphabet %}
+        {% if letter in available_initials %}
+          <button type="button" data-letter="{{ letter }}"
+            class="alphabet-letter w-6 h-3.5 text-[10px] leading-none font-bold text-green-600 rounded-md transition-all duration-150 ease-out hover:scale-150 hover:bg-green-50 hover:text-green-700 hover:shadow-sm focus:outline-none focus:scale-150 focus:bg-green-50">
+            {{ letter }}
+          </button>
+        {% else %}
+          <span class="w-6 h-3.5 flex items-center justify-center text-[9px] leading-none font-medium text-gray-300">{{ letter }}</span>
+        {% endif %}
+      {% endfor %}
+    </nav>
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex-1 min-w-0">
     <div class="px-5 py-3 border-b border-gray-50">
       <p class="text-xs font-semibold text-green-500 uppercase tracking-widest">Products</p>
     </div>
     {% if products %}
-      <div class="divide-y divide-gray-50">
+      <div class="divide-y divide-gray-50 min-w-0">
         {% for product in products %}
+          {% ifchanged product.initial %}
+            <div id="letter-{{ product.initial }}" class="px-5 py-1.5 bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest scroll-mt-32 sm:scroll-mt-20">{{ product.initial }}</div>
+          {% endifchanged %}
           <div class="flex items-center px-5 py-3.5 gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
             onclick="openEditModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }}, {{ product.default_weight_g|default_if_none:'null' }})">
             <div class="flex-1 min-w-0">
@@ -72,19 +119,15 @@
                 {% if product.default_weight_g %} · saves {{ product.default_weight_g|floatformat:0 }}g{% endif %}
               </p>
             </div>
-            <button onclick="event.stopPropagation(); openUseModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }})"
+            <button onclick="event.stopPropagation(); openUseModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }}, 100, this)"
               class="shrink-0 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
               Use
             </button>
             {% if product.default_weight_g %}
-              <form method="post" action="{% url 'quick_add_use' product.pk %}" onclick="event.stopPropagation()">
-                {% csrf_token %}
-                <input type="hidden" name="weight_g" value="{{ product.default_weight_g }}">
-                <button type="submit"
-                  class="shrink-0 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
-                  {{ product.default_weight_g|floatformat:0 }}g
-                </button>
-              </form>
+              <button type="button" onclick="event.stopPropagation(); openUseModal({{ product.pk }}, '{{ product.name|escapejs }}', {{ product.kcal_per_100g }}, {{ product.protein_per_100g }}, {{ product.default_weight_g }}, this)"
+                class="shrink-0 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                {{ product.default_weight_g|floatformat:0 }}g
+              </button>
             {% endif %}
             <form method="post" action="{% url 'product_delete' product.pk %}" class="inline"
               onsubmit="return confirm('Delete {{ product.name|escapejs }}?')" onclick="event.stopPropagation()">
@@ -100,48 +143,56 @@
       </div>
     {% else %}
       <div class="px-5 py-8 text-center">
-        <p class="text-sm text-gray-400 mb-3">No products yet.</p>
-        <button onclick="document.getElementById('new-product-modal').classList.remove('hidden')"
-          class="text-sm font-semibold text-green-600 hover:text-green-700">
-          Add your first product →
-        </button>
+        {% if q %}
+          <p class="text-sm text-gray-400 mb-3">No products match “{{ q }}”.</p>
+          <a href="{% url 'product_list_detail' plist.pk %}" class="text-sm font-semibold text-green-600 hover:text-green-700">Clear search</a>
+        {% else %}
+          <p class="text-sm text-gray-400 mb-3">No products yet.</p>
+          <button onclick="document.getElementById('new-product-modal').classList.remove('hidden')"
+            class="text-sm font-semibold text-green-600 hover:text-green-700">Add your first product →</button>
+        {% endif %}
       </div>
     {% endif %}
+    </div>
   </div>
 
-  <!-- Recent today -->
-  {% if recent %}
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-5 py-3 border-b border-gray-50">
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Recent today</p>
-      </div>
-      <div class="divide-y divide-gray-50">
-        {% for entry in recent %}
-          <div class="flex items-center px-5 py-3 gap-3">
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold text-gray-900 truncate">{{ entry.name }}</p>
-              <p class="text-xs text-gray-400">{{ entry.weight_g|floatformat:0 }}g</p>
-            </div>
-            <div class="text-right">
-              <p class="text-sm font-semibold text-gray-700">{{ entry.total_kcal|floatformat:0 }} kcal</p>
-              <p class="text-xs text-gray-400">{{ entry.total_protein|floatformat:1 }}g protein</p>
-            </div>
-            <form method="post" action="{% url 'entry_delete' entry.pk %}">
-              {% csrf_token %}
-              <input type="hidden" name="next" value="{% url 'product_list_detail' plist.pk %}">
-              <button type="submit" class="text-gray-300 hover:text-red-400 transition-colors ml-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M18 6L6 18M6 6l12 12" stroke-width="1.8" stroke-linecap="round"/>
-                </svg>
-              </button>
-            </form>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
-
 </div>
+
+<!-- Send product to friend modal -->
+{% if friends %}
+<div id="send-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="closeSendModal()"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto">
+    <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+    <h3 class="text-base font-bold text-gray-900 mb-1">Send to a friend</h3>
+    <p id="send-product-name" class="text-xs text-gray-400 mb-5"></p>
+    <form method="post" id="send-form" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'product_list_detail' plist.pk %}">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Friend</label>
+        <select name="recipient" required class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-400">
+          {% for friend in friends %}<option value="{{ friend.pk }}">{{ friend.username }}</option>{% endfor %}
+        </select>
+      </div>
+      <div id="send-details" class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-green-500 uppercase tracking-widest mb-1.5">Weight (g)</label>
+          <input id="send-weight" type="number" name="weight_g" min="1" step="0.1" value="100" required
+            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-400">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Day</label>
+          <input type="date" name="date" value="{{ today|date:'Y-m-d' }}" required
+            class="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-400">
+        </div>
+      </div>
+      <p class="text-xs text-gray-400">The entry will be added only after your friend accepts the notification.</p>
+      <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors">Send for approval</button>
+    </form>
+  </div>
+</div>
+{% endif %}
 
 <!-- Use product modal (products without a saved quantity) -->
 <div id="use-modal" class="fixed inset-0 z-50 hidden">
@@ -162,7 +213,27 @@
           class="w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-semibold flex items-center justify-center transition-colors">+</button>
       </div>
       <p class="text-center text-sm text-gray-500 mb-5 h-5" id="use-preview"></p>
-      <button type="submit"
+      {% if friends %}
+        <button type="button" id="use-friend-toggle" onclick="toggleUseFriend()" aria-pressed="false"
+          class="w-full flex items-center justify-between px-4 py-3 mb-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-green-50 text-sm transition-colors">
+          <span class="flex items-center gap-2 font-semibold text-gray-600">
+            <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM19 8v6M22 11h-6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Add for a friend too
+          </span>
+          <span class="flex items-center gap-2">
+            <span id="use-friend-chevron" class="text-gray-400 transition-transform">⌄</span>
+          </span>
+        </button>
+        <div id="use-friend-fields" class="hidden mb-4">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Friend</label>
+          <select id="use-recipient" name="recipient" disabled onchange="updateUseFriendState()"
+            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-400">
+            {% for friend in friends %}<option value="{{ friend.pk }}">{{ friend.username }}</option>{% endfor %}
+          </select>
+          <p class="text-xs text-gray-400 mt-1.5">They will receive a notification and approve it first.</p>
+        </div>
+      {% endif %}
+      <button type="submit" id="use-submit-label"
         class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors">
         Add to today
       </button>
@@ -252,6 +323,29 @@
         Save changes
       </button>
     </form>
+    <div class="mt-3 pt-3 border-t border-gray-100">
+      <button type="button" onclick="toggleCopyProduct()"
+        class="w-full flex items-center justify-center gap-2 text-sm font-semibold text-gray-500 hover:text-green-600 py-2 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2" stroke-width="1.8"/><path d="M15 9V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7a2 2 0 002 2h3" stroke-width="1.8"/></svg>
+        Copy to another list
+      </button>
+      <div id="copy-panel" class="hidden mt-2">
+        {% if other_lists %}
+        <form method="post" id="copy-form" class="hidden mt-2 flex gap-2">
+          {% csrf_token %}
+          <select name="target_list" required class="flex-1 min-w-0 rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-400">
+            {% for list in other_lists %}<option value="{{ list.pk }}">{{ list.name }}</option>{% endfor %}
+          </select>
+          <button type="submit" class="bg-green-500 hover:bg-green-600 text-white text-sm font-semibold px-4 rounded-xl transition-colors">Copy</button>
+        </form>
+        {% else %}
+          <div class="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-center">
+            <p class="text-xs text-gray-500 mb-2">Create another list before copying this product.</p>
+            <a href="{% url 'product_lists' %}" class="text-xs font-semibold text-green-600 hover:text-green-700">Go to product lists →</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </div>
 
@@ -275,20 +369,56 @@
 </div>
 
 <script>
-  let usePk = null, useKcal = 0, useProt = 0;
+  let usePk = null, useKcal = 0, useProt = 0, useTrigger = null;
 
-  function openUseModal(pk, name, kcal, prot) {
+  function openUseModal(pk, name, kcal, prot, weight = 100, trigger = null) {
     usePk = pk; useKcal = kcal; useProt = prot;
+    useTrigger = trigger;
     document.getElementById('use-product-name').textContent = name;
     document.getElementById('use-product-info').textContent = `${kcal} kcal · ${prot}g protein per 100g`;
     document.getElementById('use-form').action = `/quick-add/product/${pk}/use/`;
-    document.getElementById('use-weight').value = 100;
+    document.getElementById('use-weight').value = weight;
+    resetUseFriend();
     updateUsePreview();
     document.getElementById('use-modal').classList.remove('hidden');
   }
 
   function closeUseModal() {
     document.getElementById('use-modal').classList.add('hidden');
+  }
+
+  function resetUseFriend() {
+    const fields = document.getElementById('use-friend-fields');
+    if (!fields) return;
+    fields.classList.add('hidden');
+    document.getElementById('use-recipient').disabled = true;
+    const toggle = document.getElementById('use-friend-toggle');
+    toggle.setAttribute('aria-pressed', 'false');
+    toggle.classList.remove('border-green-200', 'bg-green-50');
+    document.getElementById('use-submit-label').textContent = 'Add to today';
+    document.getElementById('use-friend-chevron').classList.remove('rotate-180');
+  }
+
+  function toggleUseFriend() {
+    const fields = document.getElementById('use-friend-fields');
+    const willOpen = fields.classList.contains('hidden');
+    fields.classList.toggle('hidden');
+    document.getElementById('use-recipient').disabled = !willOpen;
+    document.getElementById('use-friend-toggle').setAttribute('aria-pressed', String(willOpen));
+    document.getElementById('use-friend-chevron').classList.toggle('rotate-180', willOpen);
+    updateUseFriendState();
+  }
+
+  function updateUseFriendState() {
+    const recipient = document.getElementById('use-recipient');
+    const enabled = !recipient.disabled;
+    const toggle = document.getElementById('use-friend-toggle');
+    toggle.classList.toggle('border-green-200', enabled);
+    toggle.classList.toggle('bg-green-50', enabled);
+    const friendName = recipient.options[recipient.selectedIndex]?.text || 'friend';
+    document.getElementById('use-submit-label').textContent = enabled
+      ? `Add to today + send to ${friendName}`
+      : 'Add to today';
   }
 
   function adjustUseWeight(delta) {
@@ -305,12 +435,57 @@
 
   document.getElementById('use-weight').addEventListener('input', updateUsePreview);
 
+  document.getElementById('use-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const submit = document.getElementById('use-submit-label');
+    const originalSubmitText = submit.textContent;
+    submit.disabled = true;
+    submit.textContent = 'Adding…';
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+      });
+      if (!response.ok) throw new Error('Unable to add product');
+
+      closeUseModal();
+      if (useTrigger) {
+        const animatedTrigger = useTrigger;
+        const originalHtml = animatedTrigger.innerHTML;
+        useTrigger = null;
+        animatedTrigger.disabled = true;
+        animatedTrigger.innerHTML = '<svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 12l4 4L19 6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        window.setTimeout(() => {
+          animatedTrigger.innerHTML = originalHtml;
+          animatedTrigger.disabled = false;
+        }, 1200);
+      }
+    } catch (error) {
+      submit.textContent = 'Try again';
+      window.setTimeout(() => { submit.textContent = originalSubmitText; }, 1400);
+    } finally {
+      submit.disabled = false;
+      if (!document.getElementById('use-modal').classList.contains('hidden')) {
+        submit.textContent = originalSubmitText;
+      }
+    }
+  });
+
   function openEditModal(pk, name, kcal, prot, defaultWeight) {
     document.getElementById('edit-form').action = `/quick-add/product/${pk}/edit/`;
     document.getElementById('edit-name').value = name;
     document.getElementById('edit-kcal').value = kcal;
     document.getElementById('edit-protein').value = prot;
     document.getElementById('edit-default-weight').value = defaultWeight !== null ? defaultWeight : '';
+    const copyForm = document.getElementById('copy-form');
+    document.getElementById('copy-panel').classList.add('hidden');
+    if (copyForm) {
+      copyForm.action = `/quick-add/product/${pk}/copy/`;
+      copyForm.classList.remove('hidden');
+    }
     document.getElementById('edit-product-modal').classList.remove('hidden');
   }
 
@@ -318,8 +493,38 @@
     document.getElementById('edit-product-modal').classList.add('hidden');
   }
 
+  function toggleCopyProduct() {
+    document.getElementById('copy-panel').classList.toggle('hidden');
+  }
+
   function openRenameModal() {
     document.getElementById('rename-modal').classList.remove('hidden');
   }
+
+  function openSendModal(pk, name, defaultWeight) {
+    document.getElementById('send-form').action = `/quick-add/product/${pk}/send/`;
+    document.getElementById('send-product-name').textContent = name;
+    document.getElementById('send-weight').value = defaultWeight !== null ? defaultWeight : 100;
+    document.getElementById('send-weight').readOnly = false;
+    document.querySelector('#send-details input[name="date"]').disabled = false;
+    document.getElementById('send-modal').classList.remove('hidden');
+  }
+
+  function closeSendModal() {
+    document.getElementById('send-modal').classList.add('hidden');
+  }
+
+  let alphabetHoverTimer;
+  document.querySelectorAll('.alphabet-letter').forEach((button) => {
+    const scrollToLetter = () => {
+      const target = document.getElementById(`letter-${button.dataset.letter}`);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    button.addEventListener('click', scrollToLetter);
+    button.addEventListener('mouseenter', () => {
+      alphabetHoverTimer = window.setTimeout(scrollToLetter, 140);
+    });
+    button.addEventListener('mouseleave', () => window.clearTimeout(alphabetHoverTimer));
+  });
 </script>
 {% endblock %}

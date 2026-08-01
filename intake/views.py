@@ -3,13 +3,17 @@ import calendar as cal_module
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.contrib import messages
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.db import transaction
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import FoodEntry, ProductList, QuickAddProduct
+from .models import FoodEntry, Friendship, ProductEntryRequest, ProductList, QuickAddProduct
 
 
 def _parse_decimal(raw):
@@ -27,6 +31,27 @@ def _day_summary(user, day):
     kcal = sum(e.total_kcal for e in entries)
     protein = sum(e.total_protein for e in entries)
     return kcal, protein
+
+
+def _accepted_friendships(user):
+    return Friendship.objects.filter(
+        Q(sender=user) | Q(recipient=user),
+        status=Friendship.STATUS_ACCEPTED,
+    ).select_related('sender', 'recipient')
+
+
+def _friends(user):
+    return [
+        friendship.recipient if friendship.sender_id == user.id else friendship.sender
+        for friendship in _accepted_friendships(user)
+    ]
+
+
+def _are_friends(first, second):
+    return Friendship.objects.filter(
+        Q(sender=first, recipient=second) | Q(sender=second, recipient=first),
+        status=Friendship.STATUS_ACCEPTED,
+    ).exists()
 
 
 # ── Home ──────────────────────────────────────────────────────────────────────
@@ -54,6 +79,7 @@ def home(request):
         'protein_pct': protein_pct,
         'quick_entries': quick_entries,
         'lists': lists,
+        'friends': _friends(request.user),
     })
 
 
@@ -160,13 +186,9 @@ def add_meal(request, target_date=None):
 
 @login_required
 def product_lists(request):
-    today = date.today()
     lists = ProductList.objects.filter(owner=request.user).annotate(product_count=Count('products'))
-    recent = FoodEntry.objects.filter(user=request.user, date=today, source=FoodEntry.SOURCE_QUICK)
     return render(request, 'intake/product_lists.html', {
         'lists': lists,
-        'recent': recent,
-        'today': today,
     })
 
 
@@ -185,12 +207,23 @@ def product_list_create(request):
 def product_list_detail(request, pk):
     plist = get_object_or_404(ProductList, pk=pk, owner=request.user)
     today = date.today()
+    q = request.GET.get('q', '').strip()
     products = plist.products.all()
-    recent = FoodEntry.objects.filter(user=request.user, date=today, source=FoodEntry.SOURCE_QUICK)
+    if q:
+        products = products.filter(name__icontains=q)
+    products = list(products)
+    for product in products:
+        first = product.name[:1].upper()
+        product.initial = first if first.isalpha() else '#'
+    available_initials = {product.initial for product in products}
     return render(request, 'intake/product_list_detail.html', {
         'plist': plist,
         'products': products,
-        'recent': recent,
+        'q': q,
+        'alphabet': 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        'available_initials': available_initials,
+        'friends': _friends(request.user),
+        'other_lists': ProductList.objects.filter(owner=request.user).exclude(pk=plist.pk),
         'today': today,
     })
 
@@ -305,9 +338,12 @@ def quick_add_product_delete(request, pk):
 
 @login_required
 @require_POST
+@transaction.atomic
 def quick_add_use(request, pk):
     product = get_object_or_404(QuickAddProduct, pk=pk, product_list__owner=request.user)
     weight_g = _parse_decimal(request.POST.get('weight_g')) or product.default_weight_g
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    added = False
 
     date_param = request.GET.get('date') or request.POST.get('date')
     try:
@@ -325,10 +361,228 @@ def quick_add_use(request, pk):
             weight_g=weight_g,
             source=FoodEntry.SOURCE_QUICK,
         )
+        added = True
+
+        recipient_id = request.POST.get('recipient')
+        if recipient_id:
+            recipient = User.objects.filter(pk=recipient_id).first()
+            if recipient and _are_friends(request.user, recipient):
+                ProductEntryRequest.objects.create(
+                    sender=request.user,
+                    recipient=recipient,
+                    product=product,
+                    product_name=product.name,
+                    kcal_per_100g=product.kcal_per_100g,
+                    protein_per_100g=product.protein_per_100g,
+                    weight_g=weight_g,
+                    date=entry_date,
+                )
+                if not is_ajax:
+                    messages.success(request, f'Added for you and sent to {recipient.username} for approval.')
+
+    if is_ajax:
+        return JsonResponse({'ok': added}, status=200 if added else 400)
 
     if str(entry_date) != str(date.today()):
         return redirect('calendar_day', day=str(entry_date))
     return redirect('product_list_detail', pk=product.product_list_id)
+
+
+@login_required
+@require_POST
+def quick_add_product_copy(request, pk):
+    product = get_object_or_404(QuickAddProduct, pk=pk, product_list__owner=request.user)
+    target = get_object_or_404(ProductList, pk=request.POST.get('target_list'), owner=request.user)
+    if target.pk == product.product_list_id:
+        messages.error(request, 'Choose another list.')
+        return redirect('product_list_detail', pk=product.product_list_id)
+
+    QuickAddProduct.objects.create(
+        product_list=target,
+        name=product.name,
+        kcal_per_100g=product.kcal_per_100g,
+        protein_per_100g=product.protein_per_100g,
+        default_weight_g=product.default_weight_g,
+    )
+    messages.success(request, f'Copied {product.name} to {target.name}.')
+    return redirect('product_list_detail', pk=product.product_list_id)
+
+
+@login_required
+@require_POST
+def product_request_create(request, pk):
+    product = get_object_or_404(QuickAddProduct, pk=pk, product_list__owner=request.user)
+    recipient = get_object_or_404(User, pk=request.POST.get('recipient'))
+    weight_g = _parse_decimal(request.POST.get('weight_g')) or product.default_weight_g
+    try:
+        entry_date = date.fromisoformat(request.POST.get('date') or str(date.today()))
+    except ValueError:
+        entry_date = date.today()
+
+    if not _are_friends(request.user, recipient):
+        messages.error(request, 'You can only send products to accepted friends.')
+    elif not weight_g or weight_g <= 0:
+        messages.error(request, 'Enter a valid product weight.')
+    else:
+        ProductEntryRequest.objects.create(
+            sender=request.user,
+            recipient=recipient,
+            product=product,
+            product_name=product.name,
+            kcal_per_100g=product.kcal_per_100g,
+            protein_per_100g=product.protein_per_100g,
+            weight_g=weight_g,
+            date=entry_date,
+        )
+        messages.success(request, f'Sent to {recipient.username} for approval.')
+    return redirect('product_list_detail', pk=product.product_list_id)
+
+
+@login_required
+@require_POST
+def entry_request_create(request, pk):
+    entry = get_object_or_404(FoodEntry, pk=pk, user=request.user)
+    recipient = get_object_or_404(User, pk=request.POST.get('recipient'))
+
+    if not _are_friends(request.user, recipient):
+        messages.error(request, 'You can only send products to accepted friends.')
+    else:
+        ProductEntryRequest.objects.create(
+            sender=request.user,
+            recipient=recipient,
+            product_name=entry.name,
+            kcal_per_100g=entry.kcal_per_100g,
+            protein_per_100g=entry.protein_per_100g,
+            weight_g=entry.weight_g,
+            date=entry.date,
+        )
+        messages.success(request, f'Sent to {recipient.username} for approval.')
+
+    next_url = request.POST.get('next')
+    return redirect(next_url or 'home')
+
+
+@login_required
+@require_POST
+def entry_repeat(request, pk):
+    entry = get_object_or_404(FoodEntry, pk=pk, user=request.user)
+    FoodEntry.objects.create(
+        user=request.user,
+        date=entry.date,
+        name=entry.name,
+        kcal_per_100g=entry.kcal_per_100g,
+        protein_per_100g=entry.protein_per_100g,
+        weight_g=entry.weight_g,
+        source=entry.source,
+    )
+    messages.success(request, f'Added {entry.name} again.')
+    next_url = request.POST.get('next')
+    return redirect(next_url or 'home')
+
+
+# ── Friends and notifications ────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def friend_request_create(request):
+    username = request.POST.get('username', '').strip()
+    recipient = User.objects.filter(username__iexact=username, is_active=True).first()
+    if not recipient:
+        messages.error(request, 'No active user with that username was found.')
+    elif recipient == request.user:
+        messages.error(request, 'You cannot add yourself as a friend.')
+    elif Friendship.objects.filter(
+        Q(sender=request.user, recipient=recipient) | Q(sender=recipient, recipient=request.user)
+    ).exists():
+        messages.error(request, 'A friendship or invitation already exists for this user.')
+    else:
+        Friendship.objects.create(sender=request.user, recipient=recipient)
+        messages.success(request, f'Friend invitation sent to {recipient.username}.')
+    return redirect('settings')
+
+
+@login_required
+@require_POST
+def friend_request_respond(request, pk, action):
+    friendship = get_object_or_404(
+        Friendship,
+        pk=pk,
+        recipient=request.user,
+        status=Friendship.STATUS_PENDING,
+    )
+    if action == 'accept':
+        friendship.status = Friendship.STATUS_ACCEPTED
+        friendship.responded_at = timezone.now()
+        friendship.save(update_fields=['status', 'responded_at'])
+        messages.success(request, f'You and {friendship.sender.username} are now friends.')
+    elif action == 'decline':
+        friendship.delete()
+    return redirect('notifications')
+
+
+@login_required
+@require_POST
+def friend_remove(request, pk):
+    friendship = get_object_or_404(
+        Friendship.objects.filter(Q(sender=request.user) | Q(recipient=request.user)),
+        pk=pk,
+        status=Friendship.STATUS_ACCEPTED,
+    )
+    friendship.delete()
+    messages.success(request, 'Friend removed.')
+    return redirect('settings')
+
+
+@login_required
+def notifications(request):
+    friend_requests = Friendship.objects.filter(
+        recipient=request.user,
+        status=Friendship.STATUS_PENDING,
+    ).select_related('sender')
+    product_requests = ProductEntryRequest.objects.filter(
+        recipient=request.user,
+        status=ProductEntryRequest.STATUS_PENDING,
+    ).select_related('sender')
+    recent_responses = ProductEntryRequest.objects.filter(
+        sender=request.user,
+    ).exclude(status=ProductEntryRequest.STATUS_PENDING).select_related('recipient')[:10]
+    return render(request, 'intake/notifications.html', {
+        'friend_requests': friend_requests,
+        'product_requests': product_requests,
+        'recent_responses': recent_responses,
+    })
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def product_request_respond(request, pk, action):
+    product_request = get_object_or_404(
+        ProductEntryRequest.objects.select_for_update(),
+        pk=pk,
+        recipient=request.user,
+        status=ProductEntryRequest.STATUS_PENDING,
+    )
+    if action == 'accept':
+        entry = FoodEntry.objects.create(
+            user=request.user,
+            date=product_request.date,
+            name=product_request.product_name,
+            kcal_per_100g=product_request.kcal_per_100g,
+            protein_per_100g=product_request.protein_per_100g,
+            weight_g=product_request.weight_g,
+            source=FoodEntry.SOURCE_QUICK,
+        )
+        product_request.status = ProductEntryRequest.STATUS_ACCEPTED
+        product_request.created_entry = entry
+        messages.success(request, f'{product_request.product_name} was added to your daily intake.')
+    elif action == 'decline':
+        product_request.status = ProductEntryRequest.STATUS_DECLINED
+    else:
+        return redirect('notifications')
+    product_request.responded_at = timezone.now()
+    product_request.save(update_fields=['status', 'created_entry', 'responded_at'])
+    return redirect('notifications')
 
 
 # ── Delete Entry ──────────────────────────────────────────────────────────────
@@ -461,15 +715,28 @@ def calendar_day(request, day):
 def settings_view(request):
     profile = request.user.profile
     if request.method == 'POST':
-        try:
-            kcal_goal = int(request.POST.get('kcal_goal', profile.kcal_goal))
-            protein_goal = int(request.POST.get('protein_goal', profile.protein_goal))
-            if kcal_goal > 0:
-                profile.kcal_goal = kcal_goal
-            if protein_goal > 0:
-                profile.protein_goal = protein_goal
-            profile.save()
-        except (ValueError, TypeError):
-            pass
+        if request.POST.get('setting_type') == 'appearance':
+            profile.dark_mode = request.POST.get('dark_mode') == 'on'
+            profile.save(update_fields=['dark_mode'])
+        else:
+            try:
+                kcal_goal = int(request.POST.get('kcal_goal', profile.kcal_goal))
+                protein_goal = int(request.POST.get('protein_goal', profile.protein_goal))
+                if kcal_goal > 0:
+                    profile.kcal_goal = kcal_goal
+                if protein_goal > 0:
+                    profile.protein_goal = protein_goal
+                profile.save(update_fields=['kcal_goal', 'protein_goal'])
+            except (ValueError, TypeError):
+                pass
         return redirect('settings')
-    return render(request, 'intake/settings.html', {'profile': profile})
+    friendships = _accepted_friendships(request.user)
+    outgoing_requests = Friendship.objects.filter(
+        sender=request.user,
+        status=Friendship.STATUS_PENDING,
+    ).select_related('recipient')
+    return render(request, 'intake/settings.html', {
+        'profile': profile,
+        'friendships': friendships,
+        'outgoing_requests': outgoing_requests,
+    })

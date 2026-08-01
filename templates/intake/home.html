@@ -101,17 +101,34 @@
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Recent today</p>
         <div class="space-y-1">
           {% for entry in quick_entries %}
-            <div class="flex items-center justify-between text-sm py-1">
-              <div>
-                <span class="font-medium text-gray-800">{{ entry.name }}</span>
-                <span class="text-gray-400 ml-2">{{ entry.weight_g|floatformat:0 }}g</span>
+            <div class="flex items-center text-sm py-2 gap-2 sm:gap-3 rounded-lg {% if friends %}cursor-pointer hover:bg-gray-50 transition-colors{% endif %}"
+              {% if friends %}onclick="openHomeSendModal({{ entry.pk }}, '{{ entry.name|escapejs }}', {{ entry.weight_g }})" title="Send this entry to a friend"{% endif %}>
+              <div class="flex-1 min-w-0">
+                <p class="font-medium text-gray-800 truncate">{{ entry.name }}</p>
+                <p class="text-xs text-gray-400">{{ entry.weight_g|floatformat:0 }}g</p>
               </div>
-              <div class="flex items-center gap-3">
-                <span class="text-gray-500 text-xs">{{ entry.total_kcal|floatformat:0 }} kcal · {{ entry.total_protein|floatformat:0 }}g</span>
-                <form method="post" action="{% url 'entry_delete' entry.pk %}" class="inline">
+              <div class="w-20 shrink-0 text-right">
+                <p class="font-semibold text-gray-700">{{ entry.total_kcal|floatformat:0 }} kcal</p>
+                <p class="text-xs text-gray-400">{{ entry.total_protein|floatformat:1 }}g protein</p>
+              </div>
+              <div class="w-[6.5rem] shrink-0 flex items-center justify-end gap-2">
+                <form method="post" action="{% url 'entry_repeat' entry.pk %}" class="shrink-0" onclick="event.stopPropagation()">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{% url 'home' %}">
+                  <button type="submit" class="w-8 h-8 shrink-0 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-colors" title="Add again" aria-label="Add {{ entry.name }} again">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/></svg>
+                  </button>
+                </form>
+                {% if friends %}
+                  <button type="button" onclick="event.stopPropagation(); openHomeSendModal({{ entry.pk }}, '{{ entry.name|escapejs }}', {{ entry.weight_g }})"
+                    class="w-8 h-8 shrink-0 rounded-lg bg-gray-50 hover:bg-green-50 text-gray-400 hover:text-green-600 flex items-center justify-center transition-colors" aria-label="Send {{ entry.name }} to a friend">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM19 8v6M22 11h-6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                {% endif %}
+                <form method="post" action="{% url 'entry_delete' entry.pk %}" class="w-4 shrink-0" onclick="event.stopPropagation()">
                   {% csrf_token %}
                   <input type="hidden" name="next" value="/">
-                  <button type="submit" class="text-gray-300 hover:text-red-400 transition-colors">
+                  <button type="submit" class="w-4 h-8 text-gray-300 hover:text-red-400 transition-colors flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path d="M18 6L6 18M6 6l12 12" stroke-width="1.8" stroke-linecap="round"/>
                     </svg>
@@ -146,4 +163,37 @@
   </a>
 
 </div>
+
+{% if friends %}
+<div id="home-send-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="closeHomeSendModal()"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-w-lg mx-auto">
+    <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+    <h3 class="text-base font-bold text-gray-900 mb-1">Send to a friend</h3>
+    <p id="home-send-name" class="text-xs text-gray-400 mb-5"></p>
+    <form method="post" id="home-send-form" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'home' %}">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Friend</label>
+        <select name="recipient" required class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-400">
+          {% for friend in friends %}<option value="{{ friend.pk }}">{{ friend.username }}</option>{% endfor %}
+        </select>
+      </div>
+      <p class="text-xs text-gray-400">Your friend will receive a notification and choose whether to add this entry.</p>
+      <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors">Send for approval</button>
+    </form>
+  </div>
+</div>
+<script>
+  function openHomeSendModal(pk, name, weight) {
+    document.getElementById('home-send-form').action = `/entries/${pk}/send/`;
+    document.getElementById('home-send-name').textContent = `${name} · ${Number(weight).toFixed(0)}g`;
+    document.getElementById('home-send-modal').classList.remove('hidden');
+  }
+  function closeHomeSendModal() {
+    document.getElementById('home-send-modal').classList.add('hidden');
+  }
+</script>
+{% endif %}
 {% endblock %}

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en" class="h-full{% if user.is_authenticated and user.profile.dark_mode %} dark{% endif %}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           colors: {
@@ -27,6 +28,21 @@
     input[type=number]::-webkit-inner-spin-button,
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number] { -moz-appearance: textfield; }
+    .no-scrollbar { scrollbar-width: none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    html.dark { color-scheme: dark; }
+    html.dark body, html.dark .bg-gray-50 { background-color: #111827 !important; }
+    html.dark .bg-white, html.dark .bg-white\/95 { background-color: #1f2937 !important; }
+    html.dark .bg-gray-100, html.dark .hover\:bg-gray-100:hover { background-color: #374151 !important; }
+    html.dark .hover\:bg-gray-50:hover { background-color: #273548 !important; }
+    html.dark .text-gray-900, html.dark .text-gray-800, html.dark .text-gray-700 { color: #f3f4f6 !important; }
+    html.dark .text-gray-600, html.dark .text-gray-500 { color: #d1d5db !important; }
+    html.dark .text-gray-400, html.dark .text-gray-300 { color: #9ca3af !important; }
+    html.dark .border-gray-50, html.dark .border-gray-100, html.dark .border-gray-200 { border-color: #374151 !important; }
+    html.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+    html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #374151 !important; }
+    html.dark input, html.dark select { background-color: #111827; color: #f3f4f6 !important; }
+    html.dark input::placeholder { color: #6b7280 !important; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-full">
@@ -36,6 +52,14 @@
     <div class="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
       <a href="{% url 'home' %}" class="font-bold text-gray-900 text-lg tracking-tight">Intake</a>
       <div class="flex items-center gap-3">
+        <a href="{% url 'notifications' %}" class="relative text-gray-400 hover:text-gray-700 transition-colors" title="Notifications" aria-label="Notifications{% if notification_count %}, {{ notification_count }} unread{% endif %}">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M13.7 21a2 2 0 01-3.4 0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          {% if notification_count %}
+            <span class="absolute -right-2 -top-2 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{{ notification_count }}</span>
+          {% endif %}
+        </a>
         <a href="{% url 'calendar' %}" class="text-gray-400 hover:text-gray-700 transition-colors" title="Calendar">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <rect x="3" y="4" width="18" height="18" rx="2" stroke-width="1.8"/>

@@ -73,38 +73,6 @@
     {% endif %}
   </div>
 
-  <!-- Recent today -->
-  {% if recent %}
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-5 py-3 border-b border-gray-50">
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Recent today</p>
-      </div>
-      <div class="divide-y divide-gray-50">
-        {% for entry in recent %}
-          <div class="flex items-center px-5 py-3 gap-3">
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold text-gray-900 truncate">{{ entry.name }}</p>
-              <p class="text-xs text-gray-400">{{ entry.weight_g|floatformat:0 }}g</p>
-            </div>
-            <div class="text-right">
-              <p class="text-sm font-semibold text-gray-700">{{ entry.total_kcal|floatformat:0 }} kcal</p>
-              <p class="text-xs text-gray-400">{{ entry.total_protein|floatformat:1 }}g protein</p>
-            </div>
-            <form method="post" action="{% url 'entry_delete' entry.pk %}">
-              {% csrf_token %}
-              <input type="hidden" name="next" value="{% url 'product_lists' %}">
-              <button type="submit" class="text-gray-300 hover:text-red-400 transition-colors ml-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M18 6L6 18M6 6l12 12" stroke-width="1.8" stroke-linecap="round"/>
-                </svg>
-              </button>
-            </form>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
-
 </div>
 
 <!-- New list modal -->

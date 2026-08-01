@@ -8,6 +8,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     kcal_goal = models.PositiveIntegerField(default=2000)
     protein_goal = models.PositiveIntegerField(default=150)
+    dark_mode = models.BooleanField(default=False)
 
     def __str__(self):
         return f'{self.user.username} profile'
@@ -82,3 +83,73 @@ class QuickAddProduct(models.Model):
 
     def __str__(self):
         return f'{self.name} — {self.product_list.owner.username}'
+
+
+class Friendship(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ACCEPTED, 'Accepted'),
+    ]
+
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friendships_sent')
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friendships_received')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['sender', 'recipient'], name='unique_friendship_direction'),
+            models.CheckConstraint(
+                condition=~models.Q(sender=models.F('recipient')),
+                name='friendship_users_must_differ',
+            ),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.sender.username} → {self.recipient.username} ({self.status})'
+
+
+class ProductEntryRequest(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_DECLINED = 'declined'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ACCEPTED, 'Accepted'),
+        (STATUS_DECLINED, 'Declined'),
+    ]
+
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_requests_sent')
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_requests_received')
+    product = models.ForeignKey(
+        QuickAddProduct,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='entry_requests',
+    )
+    product_name = models.CharField(max_length=200)
+    kcal_per_100g = models.DecimalField(max_digits=7, decimal_places=1)
+    protein_per_100g = models.DecimalField(max_digits=6, decimal_places=1)
+    weight_g = models.DecimalField(max_digits=7, decimal_places=1)
+    date = models.DateField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    created_entry = models.OneToOneField(
+        FoodEntry,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='source_request',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.product_name}: {self.sender.username} → {self.recipient.username}'
