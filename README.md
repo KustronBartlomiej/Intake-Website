@@ -17,6 +17,9 @@ A small Django hobby project for tracking daily calories and protein. Save the f
 
 ## Screenshots
 
+<details>
+<summary>View the trackers, calendar, and account screens</summary>
+
 ### Calories
 
 ![Calorie tracker](resources/calories_tracker.png)
@@ -40,6 +43,8 @@ A small Django hobby project for tracking daily calories and protein. Save the f
 ### Login
 
 ![Login page](resources/Login_page.png)
+
+</details>
 
 ## Built with
 
